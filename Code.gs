@@ -2,31 +2,22 @@ var milesrate = .56;
 
 function onOpen() {
 	var menu = SpreadsheetApp.getUi().createMenu("Update");
-	menu.addItem("Update", "update").addToUi();
-	menu.addItem("Start Over", "startover").addToUi();
-	//var html = "<h1>Make Paycheck</h1>\
-	//<p>Pay Date: <input type='text' id='dt' /></p>\
-	//<p><input type='button' value='Go' onclick='google.script.run.getPay()' /></p>";
-	//var sb = HtmlService.createHtmlOutput(html);
-	//SpreadsheetApp.getUi().showSidebar(sb);
-}
-//function getPay(){
-//
-//}
-
-function startover() {
-	var really = SpreadsheetApp.getUi().alert("This will erase the spreadsheet. Are you sure you want to do this?", SpreadsheetApp.getUi().ButtonSet);
-	if (really == "OK") {
-		getstuff("startover");
-	}
+	menu.addItem("Get Timecard", "getstuff").addToUi();
+  menu.addItem("Pay", "pay").addToUi();
 }
 
-function getstuff(status) {
+
+function getstuff() {
 	var app = SpreadsheetApp;
-	var sheet = app.getActive().getSheetByName("Paystubs");
+	var sheet = app.getActive().getSheetByName("From Calendar");
+  var paidsheet = app.getActive().getSheetByName("Paid");
+  var paid = paidsheet.getDataRange().getValues();
+  var paidsheet = {};
+  for(i=0;i<paid.length;i++){
+    paidsheet[paid[i][0]] = paid[i];
+  }
 	var cal = CalendarApp.getCalendarsByName("Childcare")[0];
-	if (status == "startover") {
-		sheet.clear();
+	sheet.clear();
 		sheet.appendRow([
 				"Week",
 				"Hours",
@@ -35,9 +26,9 @@ function getstuff(status) {
 				"Mileage Reimbursement",
 				"Total Pay",
 				"Payee",
-				"Paid"
+          "Pay"
 			]);
-	}
+	
 	var p = app.getUi().prompt("Month (English)");
 	if (p.getResponseText() == "all") {
 		var year = app.getUi().prompt("Year");
@@ -69,15 +60,11 @@ function getstuff(status) {
 	while (sd < ed) {
 		var ned = new Date(sd);
 		ned.setDate(ned.getDate() + 6);
-		var row = [Utilities.formatDate(sd, "America/Chicago", "MM-dd-yy") + " to " + Utilities.formatDate(ned, "America/Chicago", "MM-dd-yy"), 0, 0, 0, 0, 0, ""];
+		var row = [Utilities.formatDate(sd, "America/Chicago", "MM-dd-yy") + " to " + Utilities.formatDate(ned, "America/Chicago", "MM-dd-yy"), 0, 0, 0, 0, 0, "",""];
 
 		var events = cal.getEvents(sd, ned);
 
 		for (i = 0; i < events.length; i++) {
-			//cal.getEventById(events[i].getId()).setDescription(events[i].getDescription()+"\nssadd\n");
-			//if(status == "update" && !events[i].getDescription().match(/ssadd/)){
-
-
 			var emp = "";
 			var pay = 0;
 			var hours = ((new Date(events[i].getEndTime()) - new Date(events[i].getStartTime())) / 1000 / 60 / 60);
@@ -100,15 +87,35 @@ function getstuff(status) {
 			row[1] += hours;
 			row[2] += pay;
 			row[5] += (pay - (pay * .2)) + (miles * milesrate);
-			//}
+
 		}
+      if(paidsheet[row[0]]){
+        row[7] = "Paid";
+      }
 		sheet.appendRow(row);
 		sd = new Date(ned);
 		sd.setDate(sd.getDate() + 1);
 	}
-
+  sheet.getRange("H2:H99").setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Paid','Pay Now','Pay Later'], true));
+  
+  
+  
 }
 
-function update() {
-	getstuff("update");
+
+function pay(){
+  var app = SpreadsheetApp;
+	var sheet = app.getActive().getSheetByName("From Calendar");
+  var paysheet = app.getActive().getSheetByName("Paid");
+	var cal = CalendarApp.getCalendarsByName("Childcare")[0];
+  var data = sheet.getDataRange().getValues();
+  for(i=0;i<data.length;i++){
+    if(data[i][7] == "Pay Now"){
+      data[i].pop();
+      paysheet.appendRow(data[i]);
+      sheet.getRange(i+1, 8).setValue("Paid");
+    }
+  }
+  
+  
 }
